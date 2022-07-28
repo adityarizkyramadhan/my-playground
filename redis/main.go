@@ -14,7 +14,6 @@ func main() {
 		Password: "",
 		DB:       0,
 	})
-
 	pong, err := client.Ping().Result()
 	fmt.Println(pong, err)
 

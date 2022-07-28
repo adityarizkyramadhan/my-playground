@@ -1,7 +1,7 @@
 package main
 
 import (
-	"errors"
+	"fmt"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis"
@@ -21,12 +21,6 @@ type ModelInput struct {
 }
 
 func main() {
-
-	client := redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
-		Password: "",
-		DB:       3,
-	})
 
 	router := gin.Default()
 	dnsXAMPP := "root:@tcp(127.0.0.1:3306)/playground_database?parseTime=true"
@@ -48,16 +42,47 @@ func main() {
 		if err := db.Find(&test).Error; err != nil {
 			panic(err)
 		}
-		// masih gagal karena speed querry terlalu cepat
-		client.Set("alldata", test, 1*60*60)
-		data := client.Get("alldata")
-		if data == nil {
-			panic(errors.New("data in redis was not set"))
+		//
+		// obj := []*ModelTest{}
+		// err = redis.ScanStruct(value, &obj)
+		// if err != nil {
+		// 	panic(err)
+		// }
+		c.JSON(200, gin.H{
+			"message": test,
+		})
+	})
+	router.GET("/search", func(c *gin.Context) {
+		name := c.Query("name")
+		conn := redis.NewClient(&redis.Options{
+			Addr:     "localhost:6379",
+			Password: "",
+			DB:       0,
+		})
+		value, _ := conn.Get(name).Result()
+		if value == "" {
+			var test *ModelTest
+			fmt.Println("Masuk Querry")
+			if err := db.Where("name = ?", name).First(&test).Error; err != nil {
+				panic(err)
+			}
+			conn.Set(name, test.Data, 0)
+		} else {
+			fmt.Println("Masuk Redis")
 		}
+		data := conn.Get(name).Val()
 		c.JSON(200, gin.H{
 			"message": data,
-			"data":    test,
 		})
+		/*
+			Sebagai penanda bahwa query pertama akan menquery database
+			Masuk Querry
+			[GIN] 2022/07/28 - 11:53:43 | 200 |     16.2775ms |             ::1 | GET      "/search?name=RIARIO"
+			Query kedua akan mengambil data dari redis
+			Masuk Redis
+			[GIN] 2022/07/28 - 11:53:48 | 200 |     10.3964ms |             ::1 | GET      "/search?name=RIARIO"
+
+		*/
 	})
 	router.POST("/add", func(c *gin.Context) {
 		var input ModelInput
